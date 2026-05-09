@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: openclaw-gateway
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: PORT
+        value: "3000"
+      - key: OPENCLAW_CONFIG
+        value: "{}"

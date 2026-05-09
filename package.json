@@ -1,0 +1,16 @@
+{
+  "name": "openclaw-gateway",
+  "version": "1.0.0",
+  "description": "OpenClaw Gateway - Cloud Deployable",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "openclaw": "^2026.5.6"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
