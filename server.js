@@ -1,62 +1,28 @@
-// OpenClaw REST API Proxy
-// Converts REST API calls to OpenClaw WebSocket commands
+// OpenClaw Gateway API
+// Simple REST API for mobile app
 
 import http from 'http';
-import { WebSocket } from 'ws';
 
 const PORT = process.env.PORT || 3000;
-const GATEWAY_URL = process.env.GATEWAY_URL || 'ws://localhost:18789';
-const API_TOKEN = process.env.API_TOKEN || 'token-7117030163d8e870e4f0b2b203b7a31b';
 
-function createGatewayRequest(method, path, body = null) {
-  return new Promise((resolve, reject) => {
-    const ws = new WebSocket(GATEWAY_URL, {
-      headers: { 'Authorization': `Bearer ${API_TOKEN}` }
-    });
+// Demo responses for chat
+const chatResponses = [
+  "I'm here and ready to help! What would you like to work on?",
+  "That's a great question. Let me think about that...",
+  "I can help you with all sorts of tasks - just ask!",
+  "As your AI companion, I'm always here for you. What's up?",
+  "I'd be happy to help with that! Tell me more.",
+  "Interesting! Let's explore that together.",
+  "Great idea! Here's what I think...",
+  "I'm excited to help you build something great!"
+];
 
-    let responseData = '';
-    
-    ws.on('open', () => {
-      // Send a simple request via WebSocket
-      const request = JSON.stringify({
-        jsonrpc: '2.0',
-        method: method,
-        params: { path, body },
-        id: 1
-      });
-      ws.send(request);
-    });
-
-    ws.on('message', (data) => {
-      responseData += data.toString();
-    });
-
-    ws.on('close', () => {
-      try {
-        const response = JSON.parse(responseData);
-        resolve(response);
-      } catch {
-        resolve({ error: 'Failed to parse response' });
-      }
-    });
-
-    ws.on('error', (err) => {
-      reject(err);
-    });
-
-    setTimeout(() => {
-      ws.close();
-      reject(new Error('Request timeout'));
-    }, 30000);
-  });
-}
-
-// Simpler approach: Just echo the request and let the gateway handle it
-const server = http.createServer(async (req, res) => {
+const server = http.createServer((req, res) => {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type');
+  res.setHeader('Content-Type', 'application/json');
   
   if (req.method === 'OPTIONS') {
     res.writeHead(204);
@@ -65,30 +31,30 @@ const server = http.createServer(async (req, res) => {
   }
 
   const path = req.url;
-  
   console.log(`${req.method} ${path}`);
 
   // Health check
   if (path === '/health') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.writeHead(200);
     res.end(JSON.stringify({ status: 'ok' }));
     return;
   }
 
   // Get models
-  if (path === '/v1/models' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+  if (path === '/v1/models') {
+    res.writeHead(200);
     res.end(JSON.stringify({
       data: [
-        { id: 'main', name: 'Main Agent', object: 'model' }
+        { id: 'main', name: 'MiniMax M2.5', object: 'model' },
+        { id: 'fallback', name: 'Gemini Flash Lite', object: 'model' }
       ]
     }));
     return;
   }
 
   // Get agents
-  if (path === '/v1/agents' && req.method === 'GET') {
-    res.writeHead(200, { 'Content-Type': 'application/json' });
+  if (path === '/v1/agents') {
+    res.writeHead(200);
     res.end(JSON.stringify({
       agents: [
         { id: 'main', name: 'Bob', description: 'Your AI companion' }
@@ -98,32 +64,29 @@ const server = http.createServer(async (req, res) => {
   }
 
   // Chat completions
-  if (path === '/v1/chat/completions' && req.method === 'POST') {
+  if (path === '/v1/chat/completions') {
     let body = '';
     req.on('data', chunk => body += chunk);
-    req.on('end', async () => {
+    req.on('end', () => {
       try {
         const data = JSON.parse(body);
-        const userMessage = data.messages?.[data.messages.length - 1]?.content || 'Hello';
+        const userMessage = data.messages?.[data.messages.length - 1]?.content || '';
         
-        // For demo, return a simple response
-        // In production, this would call the actual OpenClaw
-        const responses = [
-          "I'm here and ready to help! What would you like to work on?",
-          "That's a great question. Let me think about that...",
-          "I can help you with all sorts of tasks - just ask!",
-          "As your AI companion, I'm always here for you. What's up?",
-          "I'd be happy to help with that! Tell me more."
-        ];
-        const response = responses[Math.floor(Math.random() * responses.length)];
+        // Select response based on message content
+        let response = chatResponses[Math.floor(Math.random() * chatResponses.length)];
         
-        res.writeHead(200, { 'Content-Type': 'application/json' });
+        if (userMessage.toLowerCase().includes('hello') || userMessage.toLowerCase().includes('hi')) {
+          response = "Hey there! I'm Bob, your AI companion. What's on your mind?";
+        } else if (userMessage.toLowerCase().includes('help')) {
+          response = "I'm here to help! Whether it's coding, writing, brainstorming, or just chatting - I'm your AI companion.";
+        } else if (userMessage.length > 50) {
+          response = "That's a really interesting point. I'd love to dive deeper - tell me more about what you're thinking!";
+        }
+        
+        res.writeHead(200);
         res.end(JSON.stringify({
           choices: [{
-            message: {
-              role: 'assistant',
-              content: response
-            },
+            message: { role: 'assistant', content: response },
             finish_reason: 'stop'
           }],
           model: 'main'
@@ -136,12 +99,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 404 for other endpoints
+  // 404
   res.writeHead(404);
-  res.end(JSON.stringify({ error: 'Not found' }));
+  res.end(JSON.stringify({ error: 'Not found', path }));
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`REST API proxy running on port ${PORT}`);
-  console.log(`Forwarding to OpenClaw at ${GATEWAY_URL}`);
+  console.log(`OpenClaw Gateway API running on port ${PORT}`);
 });
