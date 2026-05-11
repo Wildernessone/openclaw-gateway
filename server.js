@@ -99,6 +99,38 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // App sync - for mobile app data sync
+  if (path === '/v1/app/sync') {
+    if (req.method === 'GET') {
+      // Fetch app data
+      res.writeHead(200);
+      res.end(JSON.stringify({
+        contacts: [],
+        threads: [],
+        voiceCalls: [],
+        lobbyRooms: [],
+        settings: {},
+        lastSyncedAt: Date.now()
+      }));
+      return;
+    }
+    if (req.method === 'POST') {
+      let body = '';
+      req.on('data', chunk => body += chunk);
+      req.on('end', () => {
+        try {
+          // Store sync data (in-memory for now)
+          res.writeHead(200);
+          res.end(JSON.stringify({ success: true, lastSyncedAt: Date.now() }));
+        } catch (err) {
+          res.writeHead(500);
+          res.end(JSON.stringify({ error: err.message }));
+        }
+      });
+      return;
+    }
+  }
+
   // 404
   res.writeHead(404);
   res.end(JSON.stringify({ error: 'Not found', path }));
